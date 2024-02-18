@@ -41,36 +41,35 @@ eval_loader = torch.utils.data.DataLoader(val_dataset, batch_size=64, shuffle=Fa
 input_dim = 32 * 32 * 3
 
 # Define the size of the encoding (latent space)
-encoding_dim = 32 * 32 * 3
+encoding_dim = 16 * 32 * 3
 
 # Define the autoencoder class
 class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
-
         # Encoder layers
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 256),            
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Linear(256, 128),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Linear(128, encoding_dim),
-            nn.ReLU()
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
-
         # Decoder layers
         self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 128),
+            nn.ConvTranspose2d(32, 16, kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, input_dim),
+            nn.ConvTranspose2d(16, 3, kernel_size=2, stride=2, padding=0),
             nn.Sigmoid()  # Sigmoid activation for binary data
         )
 
     def forward(self, x):
+        #print(x.shape)
         x = self.encoder(x)
+        #print(x.shape)
         x = self.decoder(x)
+        #print(x.shape)
         return x
 
 # Define a function to display images
@@ -85,7 +84,6 @@ autoencoder = Autoencoder()
 
 # Define the loss function and optimizer
 criterion = nn.MSELoss()  # Mean Squared Error loss
-#criterion = nn.MSELoss()
 #criterion = lpips.LPIPS(net='alex', spatial=True)
 optimizer = optim.Adam(autoencoder.parameters(), lr=0.001)
 
@@ -95,7 +93,7 @@ for epoch in range(5):
     print(f"Epoch {epoch+1}")
     for data in train_loader:
         inputs, _ = data
-        inputs = inputs.view(-1, input_dim)  # Flatten the input if needed
+        #inputs = inputs.view(-1, input_dim)  # Flatten the input if needed
         optimizer.zero_grad()
         outputs = autoencoder(inputs)
         loss = criterion(outputs, inputs)
@@ -109,7 +107,7 @@ for epoch in range(5):
     with torch.no_grad():
         for data in eval_loader:
             inputs, _ = data
-            inputs = inputs.view(-1, input_dim)
+            #inputs = inputs.view(-1, input_dim)
             y = autoencoder(inputs)
             total_squared_error += torch.nn.functional.mse_loss(y, inputs, reduction='sum')
             #total_squared_error += criterion(inputs.view(inputs.size(0), 3, 32, 32), y.view(y.size(0), 3, 32, 32)).sum()
