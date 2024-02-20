@@ -2,8 +2,8 @@ import torch.nn as nn
 import torch.optim as optim
 import dataloader
 import autoencoder
+import train_stats
 import sys
-sys.path.insert(0, 'PerceptualSimilarity')
 import lpips
 
 model = autoencoder.Autoencoder(
@@ -29,4 +29,10 @@ model = autoencoder.Autoencoder(
     lambda epoch: 0.94,
 )
 
-model.train_model(dataloader.cifar10, 5, 1)
+print(model.compression_ratio(32 * 32 * 3))
+
+stats = model.train_model(dataloader.cifar10, 5, 1)
+
+print(stats)
+stats.plot_loss("files/loss.png")
+stats.show_images("files/images.png")
