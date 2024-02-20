@@ -22,7 +22,7 @@ class Autoencoder(nn.Module):
         self.encoder = encoder_layers.to(device)
         self.decoder = decoder_layers.to(device)
         self.loss_function = loss_function
-        self.optimizer = opt_type(self.parameters(), lr=learning_rate)
+        self.optimizer = opt_type(list(self.encoder.parameters()) + list(self.decoder.parameters()), lr=learning_rate)
         self.scheduler = scheduler_type(self.optimizer, scheduler_lambda) if scheduler_type is not None else None
             
     def forward(self, input):
@@ -41,7 +41,7 @@ class Autoencoder(nn.Module):
             for input, _ in loader.train_loader:
                 input = input.to(device)
                 self.optimizer.zero_grad()
-                output = self(input)
+                output = self.forward(input)
                 loss = self.loss_function(output, input)
                 loss.backward()
                 self.optimizer.step()
@@ -52,7 +52,7 @@ class Autoencoder(nn.Module):
             with torch.no_grad():
                 for input, _ in loader.val_loader:
                     input = input.to(device)
-                    output = self(input)
+                    output = self.forward(input)
                     total_error += self.loss_function(output, input)
                     data_size += len(input)
             if (self.scheduler is not None):

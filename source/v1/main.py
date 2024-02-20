@@ -22,7 +22,7 @@ model = autoencoder.Autoencoder(
         nn.Sigmoid(),
     ),
     nn.MSELoss(reduction='sum'),
-    #lpips.LPIPS(net='alex').to(autoencoder.device),
+    #lpips.LPIPS(net='alex', spatial=True).to(autoencoder.device),
     optim.Adam,
     0.001,
     optim.lr_scheduler.MultiplicativeLR,
