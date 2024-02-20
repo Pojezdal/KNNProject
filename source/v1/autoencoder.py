@@ -67,6 +67,6 @@ class Autoencoder(nn.Module):
     
     
     def show(self, images):
-        npimage = images.numpy()
+        npimage = images.cpu().numpy()
         plt.imshow(np.transpose(npimage, (1, 2, 0)))
         plt.show()
