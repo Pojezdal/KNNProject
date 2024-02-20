@@ -2,8 +2,8 @@ import torch.nn as nn
 import torch.optim as optim
 import dataloader
 import autoencoder
+import train_stats
 import sys
-sys.path.insert(0, 'PerceptualSimilarity')
 import lpips
 
 model = autoencoder.Autoencoder(
@@ -21,8 +21,8 @@ model = autoencoder.Autoencoder(
         nn.ConvTranspose2d(16, 3, kernel_size=2, stride=2, padding=0),
         nn.Sigmoid(),
     ),
-    #nn.MSELoss(reduction='sum'),
-    lpips.DSSIM(use_gpu=False,colorspace="RGB"),
+    nn.MSELoss(reduction='sum'),
+    #lpips.LPIPS(net='alex', spatial=True).to(autoencoder.device),
     optim.Adam,
     0.001,
     optim.lr_scheduler.MultiplicativeLR,
@@ -62,4 +62,8 @@ model2 = autoencoder.Autoencoder(
     lambda epoch: 0.95 if epoch<=50 else 1.0
 )
 
-model2.train_model(dataloader.cifar10, 1, 1)
+stats = model2.train_model(dataloader.cifar10, 1, 1)
+
+print(stats)
+stats.plot_loss("files/loss.png")
+stats.show_images("files/images.png")
