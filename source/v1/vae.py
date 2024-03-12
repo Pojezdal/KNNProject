@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import piq
-from dataloader import cifar10
+from dataloader import cifar10, cifar10_augmented
 from train_stats import TrainStats
 from scheduler_wrapper import SchedulerWrapper
 
@@ -178,7 +178,7 @@ scheduler2 = SchedulerWrapper(optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'm
 loss_fn = nn.MSELoss(reduction='sum')
 loss_fn2 = piq.SSIMLoss(kernel_size=5, reduction='sum')
 
-stats = train(model, 10, cifar10, loss_fn, optimizer, scheduler1, img_interval=5)
+stats = train(model, 10, cifar10_augmented, loss_fn, optimizer, scheduler1, img_interval=5)
 
 print(stats)
 stats.plot_loss("files/loss.png")
