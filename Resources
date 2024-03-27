@@ -3,9 +3,22 @@ Zadanie:
     https://medium.com/deelvin-machine-learning/image-compression-convolutional-neural-networks-vs-png-4d19729f851c
     https://www.amazon.science/blog/teaching-neural-networks-to-compress-images
 
-CompressAI
+CompressAI:
 https://github.com/InterDigitalInc/CompressAI?tab=readme-ov-file
   Modely: https://interdigitalinc.github.io/CompressAI/zoo.html
 
-NeuralCompression
+NeuralCompression:
 https://github.com/facebookresearch/NeuralCompression
+
+Relevantne clanky:
+  -VARIATIONAL IMAGE COMPRESSION
+   WITH A SCALE HYPERPRIOR
+    https://arxiv.org/pdf/1802.01436.pdf
+  
+  -Joint Autoregressive and Hierarchical Priors for
+   Learned Image Compression  
+    https://arxiv.org/pdf/1809.02736.pdf
+
+  -Learned Image Compression with Discretized Gaussian Mixture Likelihoods and
+   Attention Modules
+    https://arxiv.org/pdf/2001.01568.pdf
