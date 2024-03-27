@@ -2,15 +2,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
- 
-# adding Folder_2/subfolder to the system path
-sys.path.insert(0, 'PerceptualSimilarity')
-
-import lpips
+import dataloader
+import time
+from train_stats import TrainStats
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -19,108 +15,70 @@ else:
     device = torch.device("cpu")
     print("Running on the CPU")
 
-# Define transformations to apply to the images
-transform = transforms.Compose([
-    transforms.ToTensor(),  # Convert the image to a PyTorch tensor
-])
-
-# Define the training dataset
-full_dataset = torchvision.datasets.CIFAR10(root='datasets/', train=True, download=True, transform=transform)
-
-# Define the size of the validation set (e.g., 20% of the entire dataset)
-validation_size = int(0.2 * len(full_dataset))
-train_size = len(full_dataset) - validation_size
-
-# Split the dataset into training and validation sets
-train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, validation_size])
-
-# Create DataLoader instances for training and validation
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True)
-eval_loader = torch.utils.data.DataLoader(val_dataset, batch_size=64, shuffle=False)
-
-input_dim = 32 * 32 * 3
-
-# Define the size of the encoding (latent space)
-encoding_dim = 32 * 32 * 3
-
-# Define the autoencoder class
 class Autoencoder(nn.Module):
-    def __init__(self):
-        super(Autoencoder, self).__init__()
+    def __init__(self, encoder_layers, decoder_layers, loss_function = nn.MSELoss(), opt_type = optim.Adam, learning_rate = 0.001, 
+                 scheduler_type = None, scheduler_lambda = None):
+        super().__init__()
+        self.encoder = encoder_layers.to(device)
+        self.decoder = decoder_layers.to(device)
+        self.loss_function = loss_function
+        self.optimizer = opt_type(list(self.encoder.parameters()) + list(self.decoder.parameters()), lr=learning_rate)
+        self.scheduler = scheduler_type(self.optimizer, scheduler_lambda) if scheduler_type is not None else None
+            
+    def forward(self, input):
+        #print(input.shape)
+        intermediate = self.encoder(input)
+        #print(intermediate.shape)
+        output = self.decoder(intermediate)
+        #print(output.shape)
+        return output
 
-        # Encoder layers
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 256),            
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, encoding_dim),
-            nn.ReLU()
-        )
+    def train_model(self, loader : dataloader.DataLoader, epochs = 5, image_interval = 1):
+        stats = TrainStats(epochs)
+        for epoch in range(0, epochs):
+            print(f"Epoch {epoch + 1}")
+            epoch_start_time = time.time()
+            for input, _ in loader.train_loader:
+                input = input.to(device)
+                self.optimizer.zero_grad()
+                output = self.forward(input)
+                loss = self.loss_function(output, input)
+                loss.backward()
+                self.optimizer.step()
 
-        # Decoder layers
-        self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, input_dim),
-            nn.Sigmoid()  # Sigmoid activation for binary data
-        )
+            self.eval()
+            total_error = 0.0
+            data_size = 0
+            with torch.no_grad():
+                for input, _ in loader.val_loader:
+                    input = input.to(device)
+                    output = self.forward(input)
+                    total_error += self.loss_function(output, input)
+                    data_size += len(input)
+            if (self.scheduler is not None):
+                self.scheduler.step()
+            
+            stats.losses.append((epoch, total_error / data_size))
+            print(f"{self.loss_function._get_name()}: {(total_error / data_size):.5f}")
+            
+            epoch_end_time = time.time()
+            epoch_time = epoch_end_time - epoch_start_time
+            stats.total_time += epoch_time
+            print(f"Time of the epoch: {epoch_time:.2f} seconds")
 
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
-# Define a function to display images
-def imshow(img):
-    img = img / 2 + 0.5  # Unnormalize if normalization was applied during transformation
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
-
-# Instantiate the autoencoder model
-autoencoder = Autoencoder()
-
-# Define the loss function and optimizer
-criterion = nn.MSELoss()  # Mean Squared Error loss
-#criterion = nn.MSELoss()
-#criterion = lpips.LPIPS(net='alex', spatial=True)
-optimizer = optim.Adam(autoencoder.parameters(), lr=0.001)
-
-images = None
-# Assuming you have a PyTorch DataLoader with your dataset, you can iterate over it and train the autoencoder as follows:
-for epoch in range(5):
-    print(f"Epoch {epoch+1}")
-    for data in train_loader:
-        inputs, _ = data
-        inputs = inputs.view(-1, input_dim)  # Flatten the input if needed
-        optimizer.zero_grad()
-        outputs = autoencoder(inputs)
-        loss = criterion(outputs, inputs)
-        #loss = criterion(inputs.view(inputs.size(0), 3, 32, 32), outputs.view(outputs.size(0), 3, 32, 32)).sum()
-        loss.backward()
-        optimizer.step()
+            if image_interval > 0 and epoch % image_interval == 0:
+                stats.add_image(output)
         
-    autoencoder.eval()
-    total_squared_error = 0.0
-    nb_data = 0
-    with torch.no_grad():
-        for data in eval_loader:
-            inputs, _ = data
-            inputs = inputs.view(-1, input_dim)
-            y = autoencoder(inputs)
-            total_squared_error += torch.nn.functional.mse_loss(y, inputs, reduction='sum')
-            #total_squared_error += criterion(inputs.view(inputs.size(0), 3, 32, 32), y.view(y.size(0), 3, 32, 32)).sum()
-            nb_data += len(inputs)
-    
-    print(f"MSE: {total_squared_error / nb_data}")
-    
-    if images is None:
-        images = torch.cat((inputs.view(inputs.size(0), 3, 32, 32), y.view(y.size(0), 3, 32, 32)), dim=2)
-    else:
-        images = torch.cat((images, y.view(y.size(0), 3, 32, 32)), dim=2)
+        stats.add_image(input)        
+        return stats
 
-imshow(torchvision.utils.make_grid(images))
-        
+    def compression_ratio(self, input_size):
+        output_size = input_size
+        for layer in self.encoder:
+            if isinstance(layer, nn.Conv2d):
+                output_size = (((output_size / layer.in_channels) - layer.kernel_size[0] + 2 * layer.padding[0]) // (layer.stride[0] * layer.stride[0]) + 1) * layer.out_channels
+            elif isinstance(layer, nn.MaxPool2d):
+                output_size = (output_size - layer.kernel_size) // (layer.stride * layer.stride) + 1
+            elif isinstance(layer, nn.Linear):
+                output_size = layer.out_features
+        return output_size / input_size

@@ -1,2 +1,5 @@
 PerceptualSimilarity/
 datasets/
+__pycache__/
+.vscode/
+compressai/
