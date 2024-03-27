@@ -14,13 +14,15 @@ class DataLoader:
         print(f"Train size: {len(train_data)}")
 
 cifar10_dataset = torchvision.datasets.CIFAR10(root='datasets/', train=True, transform=torchvision.transforms.ToTensor(), download=True)
-stl10_dataset = torchvision.datasets.STL10(root='datasets/', split='train', transform=torchvision.transforms.ToTensor(), download=True)
+stl10_dataset = torchvision.datasets.STL10(root='datasets/', split='unlabeled', transform=torchvision.transforms.ToTensor(), download=True)
 
 cifar10 = DataLoader(
     cifar10_dataset,
+    [0.8, 0.2, 0.0],
 )
 stl10 = DataLoader(
     stl10_dataset,
+    [0.8, 0.2, 0.0]
 )
 
 class Augmentation(Enum):
@@ -78,4 +80,5 @@ cifar10_dataset_augmented = augment(cifar10_dataset, 'datasets/cifar10_augmented
 
 cifar10_augmented = DataLoader(
     cifar10_dataset_augmented,
+    [0.8, 0.2, 0.0],
 )
