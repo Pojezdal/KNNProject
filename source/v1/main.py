@@ -8,6 +8,8 @@ import sys
 import lpips
 import time
 from train_stats import TrainStats
+import compressai
+import train
 
 model = autoencoder.Autoencoder(
     nn.Sequential(
@@ -73,6 +75,8 @@ def generic_train_model(model, loader : dataloader.DataLoader, epochs = 5, image
         device = torch.device("cpu")
         print("Running on the CPU")
     stats = TrainStats(epochs)
+    model.optimizer = optimizer(model.parameters(), lr=0.001)
+    model.to(device)
     for epoch in range(0, epochs):
         print(f"Epoch {epoch + 1}")
         epoch_start_time = time.time()
@@ -80,9 +84,11 @@ def generic_train_model(model, loader : dataloader.DataLoader, epochs = 5, image
             input = input.to(device)
             model.optimizer.zero_grad()
             output = model.forward(input)
-            loss = loss_function(output, input)
+            # print(f"Output: {output}")
+            # print(f"Input: {type(input)}")
+            loss = loss_function(output['x_hat'], input)
             loss.backward()
-            optimizer.step()
+            model.optimizer.step()
 
         model.eval()
         total_error = 0.0
@@ -91,7 +97,7 @@ def generic_train_model(model, loader : dataloader.DataLoader, epochs = 5, image
             for input, _ in loader.val_loader:
                 input = input.to(device)
                 output = model.forward(input)
-                total_error += loss_function(output, input)
+                total_error += loss_function(output['x_hat'], input).item()
                 data_size += len(input)
         if (scheduler is not None):
             scheduler.step()
@@ -105,13 +111,25 @@ def generic_train_model(model, loader : dataloader.DataLoader, epochs = 5, image
         print(f"Time of the epoch: {epoch_time:.2f} seconds")
 
         if image_interval > 0 and epoch % image_interval == 0:
-            stats.add_image(output)
+            stats.add_image(output['x_hat'].to("cpu"))
     
-    stats.add_image(input)        
+    stats.add_image(input.to("cpu"))     
     return stats
 
-stats = model.train_model(dataloader.stl10, 2, 1)
+# stats = model.train_model(dataloader.stl10, 2, 1)
 
-print(stats)
-stats.plot_loss("files/loss.png")
-stats.show_images("files/images.png")
+# print(stats)
+# stats.plot_loss("files/loss.png")
+# stats.show_images("files/images.png")
+
+#----------------------------------------------
+# print("CompressAI")
+# model = compressai.zoo.bmshj2018_factorized(1, metric='mse', pretrained=False, progress=True)
+# stats = generic_train_model(model, dataloader.cifar10, 15, 5, optim.Adam, nn.MSELoss(reduction='sum'), None)
+# print(stats)
+# stats.plot_loss()
+# stats.show_images()
+# print("Done")
+
+#----------------------------------------------
+train.main(arg)
