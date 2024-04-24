@@ -3,10 +3,15 @@ import torchvision
 import os
 from enum import Enum
 import random
+import imgaug as ia
+import imgaug.augmenters as iaa
+import numpy as np
 
 class DataLoader:
-    def __init__(self, dataset, ratio = [0.75, 0.2, 0.05], batch_size = 64):
+    def __init__(self, name, dataset, ratio = [0.75, 0.2, 0.05], batch_size = 64):
+        self.name = name
         self.dataset = dataset
+        self.batch_size = batch_size
         train_data, val_data, test_data = torch.utils.data.random_split(dataset, [int(len(dataset) * ratio) for ratio in ratio])
         self.train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=True)
         self.val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size, shuffle=False)
@@ -17,29 +22,36 @@ cifar10_dataset = torchvision.datasets.CIFAR10(root='datasets/', train=True, tra
 stl10_dataset = torchvision.datasets.STL10(root='datasets/', split='unlabeled', transform=torchvision.transforms.ToTensor(), download=True)
 
 cifar10 = DataLoader(
+    "cifar10",
     cifar10_dataset,
     [0.8, 0.2, 0.0],
 )
 stl10 = DataLoader(
+    "stl10",
     stl10_dataset,
     [0.8, 0.2, 0.0]
 )
 
-class Augmentation(Enum):
-    FLIP_HORIZONTAL = 1
-    FLIP_VERTICAL = 2
-    ROTATE_90 = 3
-    ROTATE_180 = 4
-    ROTATE_270 = 5
-    COLOR_JITTER = 6
-    GAUSSIAN_BLUR = 7
-    GRAYSCALE = 8
-    SKEW = 9
+seq = iaa.Sequential([
+    iaa.Crop(px=(0, 16)),
+    iaa.Fliplr(0.4),
+    iaa.Flipud(0.3),
+    iaa.Sometimes(0.5, iaa.GaussianBlur(sigma=(0, 0.5))),
+    iaa.LinearContrast((0.75, 1.5)),
+    iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5),
+    iaa.Multiply((0.8, 1.2), per_channel=0.2),
+    iaa.Affine(
+        scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
+        translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+        rotate=(-25, 25),
+        shear=(-8, 8),
+        mode=ia.ALL
+    ),
+    iaa.Sometimes(0.05, iaa.Grayscale()),
+], random_order=True)
 
 
-def augment(original_dataset, save_path, factor=2, 
-            augmentations=[Augmentation.FLIP_HORIZONTAL, Augmentation.FLIP_VERTICAL, Augmentation.ROTATE_90, Augmentation.ROTATE_180, 
-                           Augmentation.ROTATE_270, Augmentation.COLOR_JITTER, Augmentation.GAUSSIAN_BLUR, Augmentation.GRAYSCALE, Augmentation.SKEW]):
+def augment(original_dataset, save_path, factor=2):
     if os.path.exists(save_path):
         print("Dataset already augmented, loading...")
         augmented_dataset = torch.load(save_path)
@@ -47,28 +59,13 @@ def augment(original_dataset, save_path, factor=2,
         augmented_data = []
         for img, label in original_dataset:
             augmented_data.append((img, label))
-            
-            rand_augments = random.sample(augmentations, factor - 1)
-            for augmentation in rand_augments:
-                if augmentation == Augmentation.FLIP_HORIZONTAL:
-                    augmented_data.append((torch.flip(img, [2]), label))  # Horizontal flip
-                elif augmentation == Augmentation.FLIP_VERTICAL:
-                    augmented_data.append((torch.flip(img, [1]), label))
-                elif augmentation == Augmentation.ROTATE_90:
-                    augmented_data.append((torch.rot90(img, 1, [1, 2]), label))
-                elif augmentation == Augmentation.ROTATE_180:
-                    augmented_data.append((torch.rot90(img, 2, [1, 2]), label))
-                elif augmentation == Augmentation.ROTATE_270:
-                    augmented_data.append((torch.rot90(img, 3, [1, 2]), label))
-                elif augmentation == Augmentation.COLOR_JITTER:
-                    augmented_data.append((torchvision.transforms.ColorJitter(0.5, 0.5, 0.5, 0.5)(img), label))
-                elif augmentation == Augmentation.GAUSSIAN_BLUR:
-                    augmented_data.append((torchvision.transforms.GaussianBlur(kernel_size=5)(img), label))
-                elif augmentation == Augmentation.GRAYSCALE:
-                    augmented_data.append((torchvision.transforms.Grayscale(num_output_channels=3)(img), label))
-                elif augmentation == Augmentation.SKEW:
-                    augmented_data.append((torchvision.transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), shear=15)(img), label))
-
+            img_np = img.numpy().transpose((1, 2, 0))
+            img_np = (img_np * 255).astype('uint8')
+            imgs_np = np.array([img_np] * factor)
+            imgs_aug = seq.augment_images(imgs_np).transpose((0, 3, 1, 2))
+            imgs_aug = torch.tensor(imgs_aug / 255)
+            for img_aug in imgs_aug:
+                augmented_data.append((img_aug, label))
         
         imgs, labels = zip(*augmented_data)
         augmented_dataset = torch.utils.data.TensorDataset(torch.stack(imgs), torch.tensor(labels))
@@ -79,6 +76,7 @@ def augment(original_dataset, save_path, factor=2,
 cifar10_dataset_augmented = augment(cifar10_dataset, 'datasets/cifar10_augmented.pt')
 
 cifar10_augmented = DataLoader(
+    "cifar10_augmented",
     cifar10_dataset_augmented,
     [0.8, 0.2, 0.0],
 )

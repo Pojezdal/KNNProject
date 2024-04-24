@@ -2,7 +2,7 @@ import compressai
 import torch
 from dataloader import cifar10, cifar10_augmented, stl10
 from train_stats import TrainStats
-
+from torchinfo import summary
 
 def eval(model, data_loader, loss_fn):
     stats = TrainStats(0)
@@ -36,6 +36,8 @@ def eval(model, data_loader, loss_fn):
 
 model = compressai.zoo.cheng2020_attn(6, pretrained=True)
 
-stats = eval(model, stl10, torch.nn.MSELoss(reduction='sum'))
+summary(model, (1, 3, 32, 32))
 
-stats.show_images()
+#stats = eval(model, stl10, torch.nn.MSELoss(reduction='sum'))
+
+#stats.show_images()
