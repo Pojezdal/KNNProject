@@ -2,5 +2,4 @@ PerceptualSimilarity/
 datasets/
 __pycache__/
 .vscode/
-CompressAI
-compressai
+compressai/
