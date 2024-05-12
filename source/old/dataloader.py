@@ -73,10 +73,10 @@ def augment(original_dataset, save_path, factor=2):
     
     return augmented_dataset
 
-cifar10_dataset_augmented = augment(cifar10_dataset, 'datasets/cifar10_augmented.pt')
+# cifar10_dataset_augmented = augment(cifar10_dataset, 'datasets/cifar10_augmented.pt')
 
-cifar10_augmented = DataLoader(
-    "cifar10_augmented",
-    cifar10_dataset_augmented,
-    [0.8, 0.2, 0.0],
-)
+# cifar10_augmented = DataLoader(
+#     "cifar10_augmented",
+#     cifar10_dataset_augmented,
+#     [0.8, 0.2, 0.0],
+# )
